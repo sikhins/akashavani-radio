@@ -1,0 +1,543 @@
+<!DOCTYPE html>
+<html lang="ml">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ആകാശവാണി Malayalam Live Radio</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Share+Tech+Mono&display=swap');
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: #b8a8e8;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Inter', sans-serif;
+      overflow: hidden;
+    }
+
+    .page-title {
+      color: #4a3a6e;
+      font-size: 13px;
+      font-weight: 500;
+      letter-spacing: 0.15em;
+      text-transform: uppercase;
+      margin-bottom: 18px;
+      opacity: 0.8;
+    }
+
+    .radio-card {
+      width: 860px;
+      height: 480px;
+      background: #0f0f12;
+      border-radius: 28px;
+      position: relative;
+      overflow: hidden;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.45), 0 0 0 1px rgba(255,255,255,0.06);
+    }
+
+    .arc-bg {
+      position: absolute;
+      left: -60px;
+      top: -30px;
+      width: 420px;
+      height: 540px;
+      pointer-events: none;
+    }
+
+    .freq-scale {
+      position: absolute;
+      left: 36px;
+      top: 50%;
+      transform: translateY(-50%);
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 0;
+      z-index: 5;
+    }
+    .freq-scale-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      height: 40px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .freq-scale-item:hover .tick-label { color: #9b7ee8; }
+    .tick-label {
+      font-family: 'Inter', sans-serif;
+      font-size: 11px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.35);
+      min-width: 26px;
+      text-align: right;
+      transition: color 0.2s;
+    }
+    .tick-label.active { color: #fff; font-weight: 600; }
+    .tick-line {
+      width: 16px;
+      height: 1px;
+      background: rgba(255,255,255,0.15);
+    }
+    .tick-pointer {
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+    .tick-pointer .arrow {
+      width: 0; height: 0;
+      border-top: 4px solid transparent;
+      border-bottom: 4px solid transparent;
+      border-left: 6px solid #8b6de0;
+      opacity: 0;
+      transition: opacity 0.2s;
+    }
+    .tick-pointer .h-line {
+      height: 2px;
+      background: #8b6de0;
+      width: 0;
+      transition: width 0.3s;
+    }
+    .freq-scale-item.active .tick-pointer .arrow { opacity: 1; }
+    .freq-scale-item.active .tick-pointer .h-line { width: 60px; }
+    .freq-scale-item.active .tick-label { color: #fff; }
+
+    .dial-wrap {
+      position: absolute;
+      right: -80px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 420px;
+      height: 420px;
+    }
+    .dial-svg { width: 100%; height: 100%; }
+
+    .center-panel {
+      position: absolute;
+      left: 200px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 280px;
+      z-index: 10;
+    }
+
+    .station-label {
+      font-size: 11px;
+      font-weight: 500;
+      letter-spacing: 0.12em;
+      color: rgba(255,255,255,0.4);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .station-label .freq-text {
+      color: rgba(255,255,255,0.7);
+      font-size: 13px;
+      font-weight: 300;
+    }
+
+    .freq-display {
+      background: #1c1c22;
+      border-radius: 14px;
+      padding: 10px 18px;
+      margin: 8px 0 14px;
+      border: 1px solid rgba(255,255,255,0.06);
+      box-shadow: inset 0 2px 8px rgba(0,0,0,0.4);
+    }
+    .freq-number {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 46px;
+      color: #fff;
+      letter-spacing: -1px;
+      line-height: 1;
+    }
+    .freq-number .leading { color: rgba(255,255,255,0.25); }
+
+    .band-toggle {
+      display: flex;
+      gap: 6px;
+      margin-bottom: 18px;
+    }
+    .band-btn {
+      padding: 4px 16px;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      font-family: 'Inter', sans-serif;
+      font-size: 13px;
+      font-weight: 600;
+      letter-spacing: 0.05em;
+      transition: all 0.2s;
+      background: transparent;
+      color: rgba(255,255,255,0.3);
+    }
+    .band-btn.active {
+      color: #8b6de0;
+      background: rgba(139,109,224,0.12);
+    }
+
+    .station-list {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+    }
+    .station-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      padding: 7px 10px;
+      border-radius: 10px;
+      cursor: pointer;
+      transition: background 0.2s;
+      border: 1px solid transparent;
+    }
+    .station-item:hover { background: rgba(139,109,224,0.08); }
+    .station-item.active {
+      background: rgba(139,109,224,0.15);
+      border-color: rgba(139,109,224,0.2);
+    }
+    .station-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: rgba(255,255,255,0.15);
+      flex-shrink: 0;
+    }
+    .station-item.active .station-dot { background: #8b6de0; }
+    .station-item-name {
+      font-size: 11px;
+      color: rgba(255,255,255,0.45);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    .station-item.active .station-item-name { color: rgba(255,255,255,0.9); }
+    .station-item-freq {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 11px;
+      color: rgba(139,109,224,0.6);
+    }
+    .station-item.active .station-item-freq { color: #8b6de0; }
+
+    .top-bar {
+      position: absolute;
+      top: 20px;
+      right: 24px;
+      display: flex;
+      align-items: center;
+      gap: 16px;
+      z-index: 20;
+    }
+    .rec-badge {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.7);
+      letter-spacing: 0.08em;
+    }
+    .rec-dot {
+      width: 7px; height: 7px;
+      border-radius: 50%;
+      background: #e04040;
+      box-shadow: 0 0 6px rgba(224,64,64,0.8);
+      animation: pulse-red 1.4s ease-in-out infinite;
+    }
+    @keyframes pulse-red {
+      0%,100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+    .clock {
+      font-family: 'Share Tech Mono', monospace;
+      font-size: 15px;
+      color: rgba(255,255,255,0.75);
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .clock-icon {
+      width: 15px; height: 15px;
+      border: 1.5px solid rgba(255,255,255,0.4);
+      border-radius: 50%;
+      position: relative;
+    }
+    .clock-icon::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 50%;
+      width: 4px; height: 1.5px;
+      background: rgba(255,255,255,0.4);
+      transform-origin: left center;
+      transform: translateY(-50%) rotate(-45deg);
+    }
+
+    .yt-wrapper {
+      position: absolute;
+      bottom: 16px;
+      right: 16px;
+      width: 1px; height: 1px;
+      overflow: hidden;
+      opacity: 0.01;
+      z-index: 1;
+    }
+    .yt-wrapper iframe { width: 320px; height: 180px; }
+
+    .live-badge {
+      position: absolute;
+      bottom: 20px;
+      left: 200px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 10px;
+      font-weight: 600;
+      color: rgba(255,255,255,0.5);
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      z-index: 10;
+    }
+    .live-dot {
+      width: 6px; height: 6px;
+      border-radius: 50%;
+      background: #8b6de0;
+      animation: pulse-purple 2s ease-in-out infinite;
+    }
+    @keyframes pulse-purple {
+      0%,100% { box-shadow: 0 0 0 0 rgba(139,109,224,0.6); }
+      50% { box-shadow: 0 0 0 5px rgba(139,109,224,0); }
+    }
+    .open-yt-btn {
+      position: absolute;
+      bottom: 20px;
+      right: 120px;
+      background: rgba(139,109,224,0.15);
+      border: 1px solid rgba(139,109,224,0.3);
+      border-radius: 8px;
+      padding: 5px 12px;
+      color: #8b6de0;
+      font-size: 10px;
+      font-weight: 600;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      cursor: pointer;
+      text-decoration: none;
+      z-index: 10;
+      transition: all 0.2s;
+    }
+    .open-yt-btn:hover { background: rgba(139,109,224,0.25); color: #a88de8; }
+
+    .now-playing-name {
+      font-size: 10px;
+      color: rgba(255,255,255,0.35);
+      letter-spacing: 0.05em;
+      margin-top: 2px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 240px;
+    }
+  </style>
+</head>
+<body>
+
+<div class="page-title">ആകാശവാണി · All India Radio Malayalam</div>
+
+<div class="radio-card">
+
+  <svg class="arc-bg" viewBox="0 0 420 540" fill="none" xmlns="http://www.w3.org/2000/svg">
+    <path d="M 60 20 Q 200 80 240 270 Q 260 400 160 520" stroke="#7c5cbf" stroke-width="72" stroke-linecap="round" fill="none" opacity="0.55"/>
+    <path d="M 60 20 Q 200 80 240 270 Q 260 400 160 520" stroke="#b89de8" stroke-width="30" stroke-linecap="round" fill="none" opacity="0.18"/>
+  </svg>
+
+  <div class="top-bar">
+    <div class="rec-badge">REC <span class="rec-dot"></span></div>
+    <div class="clock">
+      <div class="clock-icon"></div>
+      <span id="clock-time">00:00</span>
+    </div>
+  </div>
+
+  <div class="freq-scale" id="freqScale"></div>
+
+  <div class="center-panel">
+    <div class="station-label">
+      <span id="cur-freq-label" class="freq-text">101.9 FM</span>
+      <span>CHANNEL</span>
+    </div>
+    <div class="freq-display">
+      <div class="freq-number" id="freqDisplay">
+        <span class="leading">0</span><span id="freqMain">101.9</span>
+      </div>
+    </div>
+    <div class="now-playing-name" id="nowPlayingName">Akashavani Thiruvananthapuram</div>
+    <div class="band-toggle">
+      <button class="band-btn active" id="btnFM" onclick="setBand('FM')">FM</button>
+      <button class="band-btn" id="btnAM" onclick="setBand('AM')">AM</button>
+    </div>
+    <div class="station-list" id="stationList"></div>
+  </div>
+
+  <div class="dial-wrap">
+    <svg class="dial-svg" viewBox="0 0 420 420" id="dialSvg">
+      <circle cx="210" cy="210" r="195" fill="#181820" stroke="rgba(255,255,255,0.05)" stroke-width="1"/>
+      <circle cx="210" cy="210" r="160" fill="#0f0f12" stroke="rgba(255,255,255,0.04)" stroke-width="1"/>
+      <g id="dialTicks"></g>
+      <circle cx="210" cy="210" r="45" fill="#181820" stroke="rgba(139,109,224,0.15)" stroke-width="1.5"/>
+      <circle cx="210" cy="210" r="8" fill="#8b6de0" opacity="0.6"/>
+      <circle cx="210" cy="210" r="4" fill="#b89de8"/>
+    </svg>
+  </div>
+
+  <div class="live-badge">
+    <span class="live-dot"></span>
+    YouTube Live
+  </div>
+
+  <a class="open-yt-btn" id="openYtBtn" href="#" target="_blank">&#9658; Watch Live</a>
+
+  <div class="yt-wrapper">
+    <iframe id="ytPlayer" src="" allow="autoplay; encrypted-media" allowfullscreen></iframe>
+  </div>
+
+</div>
+
+<script>
+  const stations = [
+    { name: "Akashavani Thiruvananthapuram", short: "AIR TVM", freq: "101.9", band: "FM", channelId: "UCdQbBWqPjvHA0pBAWULMZaQ", yt: "https://www.youtube.com/@AkashavaniThiruvananthapuram" },
+    { name: "AIR News Thiruvananthapuram", short: "AIR News TVM", freq: "102.6", band: "FM", channelId: "UC2zpeg8mNPplrYTV0Hz7RCQ", yt: "https://www.youtube.com/@airnewsthiruvananthapuram" },
+    { name: "Akashvani Kochi FM", short: "AIR Kochi", freq: "102.3", band: "FM", channelId: "UCNR87CT9U4Kt9rr0GGPs4NA", yt: "https://www.youtube.com/@airkochifm" },
+    { name: "Radio Air Malayalam", short: "Radio AIR ML", freq: "100.9", band: "FM", channelId: "UC_U1roHMAkSXIz_EQBuqddg", yt: "https://www.youtube.com/@AirNewsMalayalam" },
+    { name: "Akashvani AIR", short: "Akashvani", freq: "103.0", band: "FM", channelId: "UCE87DUyPNr_oVU3xzRO9QHw", yt: "https://www.youtube.com/@akashvaniair" },
+  ];
+
+  const scaleFreqs = [107, 104, 100, 98, 96, 92, 88];
+  let currentStation = 0;
+  let currentBand = 'FM';
+
+  function updateClock() {
+    const now = new Date();
+    const h = String(now.getHours()).padStart(2,'0');
+    const m = String(now.getMinutes()).padStart(2,'0');
+    document.getElementById('clock-time').textContent = h + ':' + m;
+  }
+  updateClock();
+  setInterval(updateClock, 1000);
+
+  function buildScale() {
+    const scaleEl = document.getElementById('freqScale');
+    scaleEl.innerHTML = '';
+    scaleFreqs.forEach((f, i) => {
+      const item = document.createElement('div');
+      item.className = 'freq-scale-item';
+      const match = stations.findIndex(s => Math.round(parseFloat(s.freq)) === f);
+      if (match === currentStation && stations[currentStation].band === currentBand) {
+        item.classList.add('active');
+      }
+      item.innerHTML =
+        '<span class="tick-label ' + (item.classList.contains('active') ? 'active' : '') + '">' + f + '</span>' +
+        '<div class="tick-pointer"><div class="h-line"></div><div class="arrow"></div></div>';
+      if (match >= 0) {
+        item.style.cursor = 'pointer';
+        item.addEventListener('click', () => selectStation(match));
+      }
+      scaleEl.appendChild(item);
+    });
+  }
+
+  function buildStationList() {
+    const list = document.getElementById('stationList');
+    list.innerHTML = '';
+    stations.filter(s => s.band === currentBand).forEach((s, i) => {
+      const realIdx = stations.indexOf(s);
+      const item = document.createElement('div');
+      item.className = 'station-item' + (realIdx === currentStation ? ' active' : '');
+      item.innerHTML =
+        '<span class="station-dot"></span>' +
+        '<span class="station-item-name">' + s.name + '</span>' +
+        '<span class="station-item-freq">' + s.freq + '</span>';
+      item.addEventListener('click', () => selectStation(realIdx));
+      list.appendChild(item);
+    });
+  }
+
+  function buildDial() {
+    const ticksG = document.getElementById('dialTicks');
+    ticksG.innerHTML = '';
+    const cx = 210, cy = 210, r1 = 192, r2 = 180, r3 = 172;
+    for (let i = 0; i < 120; i++) {
+      const angle = (i / 120) * 360 - 90;
+      const rad = angle * Math.PI / 180;
+      const isMajor = i % 10 === 0;
+      const isMed = i % 5 === 0;
+      const innerR = isMajor ? r3 : isMed ? r3 + 6 : r2;
+      const x1 = cx + r1 * Math.cos(rad);
+      const y1 = cy + r1 * Math.sin(rad);
+      const x2 = cx + innerR * Math.cos(rad);
+      const y2 = cy + innerR * Math.sin(rad);
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', x1); line.setAttribute('y1', y1);
+      line.setAttribute('x2', x2); line.setAttribute('y2', y2);
+      line.setAttribute('stroke', isMajor ? 'rgba(255,255,255,0.3)' : isMed ? 'rgba(255,255,255,0.15)' : 'rgba(255,255,255,0.06)');
+      line.setAttribute('stroke-width', isMajor ? '2' : '1');
+      ticksG.appendChild(line);
+    }
+    const stAngle = -90 + (currentStation / (stations.length - 1)) * 200;
+    const arcRad = stAngle * Math.PI / 180;
+    const glow = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+    glow.setAttribute('cx', cx + 185 * Math.cos(arcRad));
+    glow.setAttribute('cy', cy + 185 * Math.sin(arcRad));
+    glow.setAttribute('r', '5');
+    glow.setAttribute('fill', '#8b6de0');
+    ticksG.appendChild(glow);
+    const defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+    defs.innerHTML = '<filter id="glow"><feGaussianBlur stdDeviation="3" result="blur"/><feMerge><feMergeNode in="blur"/><feMergeNode in="SourceGraphic"/></feMerge></filter>';
+    document.getElementById('dialSvg').prepend(defs);
+  }
+
+  function selectStation(idx) {
+    currentStation = idx;
+    const s = stations[idx];
+    document.getElementById('freqMain').textContent = s.freq;
+    document.getElementById('cur-freq-label').textContent = s.freq + ' ' + s.band;
+    document.getElementById('nowPlayingName').textContent = s.name;
+    document.getElementById('ytPlayer').src = 'https://www.youtube.com/embed/live_stream?channel=' + s.channelId + '&autoplay=1&mute=0';
+    document.getElementById('openYtBtn').href = s.yt;
+    currentBand = s.band;
+    document.getElementById('btnFM').classList.toggle('active', s.band === 'FM');
+    document.getElementById('btnAM').classList.toggle('active', s.band === 'AM');
+    buildScale();
+    buildStationList();
+    buildDial();
+  }
+
+  function setBand(band) {
+    currentBand = band;
+    document.getElementById('btnFM').classList.toggle('active', band === 'FM');
+    document.getElementById('btnAM').classList.toggle('active', band === 'AM');
+    buildStationList();
+  }
+
+  document.getElementById('dialSvg').addEventListener('click', (e) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const cx = rect.left + rect.width / 2;
+    const cy = rect.top + rect.height / 2;
+    const angle = Math.atan2(e.clientY - cy, e.clientX - cx) * 180 / Math.PI + 90;
+    const norm = ((angle % 360) + 360) % 360;
+    selectStation(Math.min(Math.round((norm / 360) * (stations.length - 1)), stations.length - 1));
+  });
+
+  buildScale();
+  buildStationList();
+  buildDial();
+  selectStation(0);
+</script>
+</body>
+</html>
