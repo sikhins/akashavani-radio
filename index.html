@@ -64,6 +64,7 @@
     .np-bars span:nth-child(3) { height: 8px;  animation-delay: 0.36s; }
     .np-bars span:nth-child(4) { height: 11px; animation-delay: 0.1s; }
     .np-bars.idle span { animation: none; height: 4px; background: rgba(255,255,255,0.18); }
+    .np-bars.loading span { animation: bar-bounce 0.4s ease-in-out infinite; }
     @keyframes bar-bounce {
       0%,100% { transform: scaleY(0.5); }
       50%      { transform: scaleY(1.6); }
@@ -105,6 +106,7 @@
       cursor: pointer;
       transition: background 0.18s, border-color 0.18s;
       -webkit-tap-highlight-color: transparent;
+      user-select: none;
     }
     .station-card:hover { background: #1e1e2a; border-color: rgba(139,109,224,0.2); }
     .station-card.active {
@@ -122,7 +124,7 @@
     .s-info { flex: 1; overflow: hidden; }
     .s-name {
       font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65);
-      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowraw; overflow: hidden; text-overflow: ellipsis;
     }
     .station-card.active .s-name { color: #fff; font-weight: 600; }
     .s-sub {
@@ -155,15 +157,22 @@
       font-size: 13px; color: rgba(255,255,255,0.2);
     }
     .f-note { font-size: 10px; color: rgba(255,255,255,0.15); letter-spacing: 0.06em; }
+
+    /* error toast */
+    .toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: #2a1a1a; border: 1px solid rgba(255,80,80,0.3);
+      color: rgba(255,120,120,0.9); font-size: 12px; padding: 10px 18px;
+      border-radius: 8px; display: none; z-index: 99;
+    }
+    .toast.show { display: block; }
   </style>
 </head>
 <body>
 
-<!-- YouTube audio player â offscreen, full-size so autoplay is not throttled -->
-<div style="position:fixed;bottom:-200px;right:0;width:320px;height:180px;pointer-events:none;z-index:-1;">
-  <iframe id="ytAudio" src="" allow="autoplay; encrypted-media" allowfullscreen
-    style="width:320px;height:180px;border:none;"></iframe>
-</div>
+<!-- Hidden audio element â actual audio playback -->
+<audio id="audioPlayer" preload="none"></audio>
+<div class="toast" id="toast"></div>
 
 <div class="radio-app">
 
@@ -196,52 +205,132 @@
 
   <div class="footer">
     <span class="f-clock" id="clock">00:00</span>
-    <span class="f-note">YouTube Live Audio</span>
+    <span class="f-note">AIR Live Stream</span>
   </div>
 
 </div>
 
+<!-- HLS.js for cross-browser HLS support -->
+<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.7/dist/hls.min.js"></script>
 <script>
   const stations = [
-    { name: "Akashavani Thiruvananthapuram", short: "101.9 FM Â· TVM", freq: "101.9", channelId: "UCdQbBWqPjvHA0pBAWULMZaQ" },
-    { name: "AIR News Thiruvananthapuram",   short: "102.6 FM Â· News", freq: "102.6", channelId: "UC2zpeg8mNPplrYTV0Hz7RCQ" },
-    { name: "Akashvani Kochi FM",            short: "102.3 FM Â· Kochi", freq: "102.3", channelId: "UCNR87CT9U4Kt9rr0GGPs4NA" },
-    { name: "Radio Air Malayalam",           short: "100.9 FM Â· ML",   freq: "100.9", channelId: "UC_U1roHMAkSXIz_EQBuqddg" },
-    { name: "Akashvani AIR",                 short: "103.0 FM",        freq: "103.0", channelId: "UCE87DUyPNr_oVU3xzRO9QHw" },
+    {
+      name: "Akashvani Kerala",
+      short: "101.9 FM Â· TVM",
+      freq: "101.9",
+      url: "https://air.pc.cdn.bitgravity.com/air/live/pbaudio230/playlist.m3u8"
+    },
+    {
+      name: "AIR News 24x7",
+      short: "102.6 FM Â· News",
+      freq: "102.6",
+      url: "https://airhlspush.pc.cdn.bitgravity.com/httppush/hlspbaudio002/hlspbaudio002_Auto.m3u8"
+    },
+    {
+      name: "FM Rainbow Kochi",
+      short: "102.3 FM Â· Kochi",
+      freq: "102.3",
+      url: "https://air.pc.cdn.bitgravity.com/air/live/pbaudio044/playlist.m3u8"
+    },
+    {
+      name: "Akashvani Thrissur",
+      short: "100.9 FM Â· Thrissur",
+      freq: "100.9",
+      url: "https://air.pc.cdn.bitgravity.com/air/live/pbaudio036/playlist.m3u8"
+    },
+    {
+      name: "VB Malayalam",
+      short: "103.0 FM Â· Vividh Bharati",
+      freq: "103.0",
+      url: "https://air.pc.cdn.bitgravity.com/air/live/pbaudio229/playlist.m3u8"
+    },
   ];
 
   let current = -1;
+  let hlsInstance = null;
+  const audioEl = document.getElementById('audioPlayer');
 
   // Build station cards
   const listEl = document.getElementById('stationList');
-  stations.forEach(function(s, i) {
-    var card = document.createElement('div');
+  stations.forEach((s, i) => {
+    const card = document.createElement('div');
     card.className = 'station-card';
     card.id = 'card' + i;
     card.innerHTML =
       '<span class="s-num">' + String(i+1).padStart(2,'0') + '</span>' +
-      '<div class="s-info"><div class="s-name">' + s.name + '</div><div class="s-sub">' + s.short + '</div></div>' +
+      '<div class="s-info">' +
+        '<div class="s-name">' + s.name + '</div>' +
+        '<div class="s-sub">' + s.short + '</div>' +
+      '</div>' +
       '<span class="s-freq">' + s.freq + '</span>' +
       '<span class="s-dot"></span>';
-    card.addEventListener('click', (function(idx) { return function() { play(idx); }; })(i));
+    card.addEventListener('click', function() { play(i); });
     listEl.appendChild(card);
   });
 
   function play(idx) {
+    // Deactivate previous card
     if (current >= 0) document.getElementById('card' + current).classList.remove('active');
+
     current = idx;
     var s = stations[idx];
     document.getElementById('card' + idx).classList.add('active');
+
+    // Update now-playing UI
     document.getElementById('npIdle').style.display = 'none';
     document.getElementById('npActive').style.display = 'block';
     document.getElementById('npName').textContent = s.name;
     document.getElementById('npFreq').textContent = s.freq + ' FM';
-    document.getElementById('npBars').classList.remove('idle');
-    document.getElementById('ytAudio').src =
-      'https://www.youtube.com/embed/live_stream?channel=' + s.channelId +
-      '&autoplay=1&mute=0&controls=0&modestbranding=1&rel=0';
+    document.getElementById('npBars').className = 'np-bars loading';
+
+    // Destroy previous HLS instance
+    if (hlsInstance) {
+      hlsInstance.destroy();
+      hlsInstance = null;
+    }
+    audioEl.src = '';
+
+    if (Hls.isSupported()) {
+      hlsInstance = new Hls({ enableWorker: false });
+      hlsInstance.loadSource(s.url);
+      hlsInstance.attachMedia(audioEl);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+        audioEl.play().then(function() {
+          document.getElementById('npBars').className = 'np-bars';
+        }).catch(function(e) {
+          showError('Playback blocked. Tap to try again.');
+          document.getElementById('npBars').className = 'np-bars idle';
+        });
+      });
+      hlsInstance.on(Hls.Events.ERROR, function(event, data) {
+        if (data.fatal) {
+          showError('Stream error. Try another station.');
+          document.getElementById('npBars').className = 'np-bars idle';
+        }
+      });
+    } else if (audioEl.canPlayType('application/vnd.apple.mpegurl')) {
+      // Native HLS (Safari / iOS)
+      audioEl.src = s.url;
+      audioEl.play().then(function() {
+        document.getElementById('npBars').className = 'np-bars';
+      }).catch(function(e) {
+        showError('Playback error. Tap to try again.');
+        document.getElementById('npBars').className = 'np-bars idle';
+      });
+    } else {
+      showError('HLS not supported in this browser.');
+      document.getElementById('npBars').className = 'np-bars idle';
+    }
   }
 
+  function showError(msg) {
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    setTimeout(function() { t.classList.remove('show'); }, 4000);
+  }
+
+  // Clock
   function tick() {
     var now = new Date();
     document.getElementById('clock').textContent =
