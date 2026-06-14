@@ -574,18 +574,24 @@ const labelsG = document.getElementById('labels');
 });
 
 // ââ Station positions ââ
-// Evenly spread our 5 stations on the LEFT arc (angles ~150Â° to ~240Â°, the visible left side)
-// Map by actual frequency but stretched for better visual spread
+// Actual needle angles track real frequency
 const stationAngles = stations.map((s) => freqToAngle(parseFloat(s.freq)));
+
+// Visual dot angles: evenly spread across 145Â°â335Â° so they're never crowded
+// (clicking a dot still tunes to the real freq â needle goes to real angle)
+const DOT_START = 145, DOT_END = 335;
+const dotVisualAngles = stations.map((_, i) =>
+  DOT_START + (i / (stations.length - 1)) * (DOT_END - DOT_START)
+);
 
 const dotsG  = document.getElementById('stationDots');
 const hitsG  = document.getElementById('stationHits');
 stations.forEach((s, i) => {
-  const angle = stationAngles[i];
-  const pos   = toXY(CX, CY, R - 52, angle);
+  const angle = dotVisualAngles[i];
+  const pos   = toXY(CX, CY, R - 48, angle);
 
   // Hit target
-  const hit = svgEl('circle', { cx: pos.x, cy: pos.y, r: 18, fill: 'transparent', cursor: 'pointer' });
+  const hit = svgEl('circle', { cx: pos.x, cy: pos.y, r: 20, fill: 'transparent', cursor: 'pointer' });
   hit.addEventListener('click', () => tuneAndPlay(i));
   hitsG.appendChild(hit);
 
@@ -598,12 +604,13 @@ stations.forEach((s, i) => {
   dot.addEventListener('click', () => tuneAndPlay(i));
   dotsG.appendChild(dot);
 
-  // Station freq label near dot
-  const lpos = toXY(CX, CY, R - 82, angle);
+  // Short station label, staggered radius so they don't overlap
+  const labelR = R - 48 + (i % 2 === 0 ? -28 : 28);
+  const lpos = toXY(CX, CY, labelR, angle);
   const ltxt = svgEl('text', {
     x: lpos.x, y: lpos.y,
     'text-anchor': 'middle', 'dominant-baseline': 'middle',
-    fill: '#3a3560', 'font-size': '9.5',
+    fill: '#3a3560', 'font-size': '9',
     'font-family': "'Share Tech Mono', monospace",
     id: 'slabel' + i
   });
