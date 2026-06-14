@@ -124,7 +124,7 @@
     .s-info { flex: 1; overflow: hidden; }
     .s-name {
       font-size: 13px; font-weight: 500; color: rgba(255,255,255,0.65);
-      white-space: nowraw; overflow: hidden; text-overflow: ellipsis;
+      white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
     }
     .station-card.active .s-name { color: #fff; font-weight: 600; }
     .s-sub {
@@ -289,16 +289,22 @@
       hlsInstance = null;
     }
     audioEl.src = '';
+    audioEl.load();
 
     if (Hls.isSupported()) {
-      hlsInstance = new Hls({ enableWorker: false });
+      hlsInstance = new Hls({ enableWorker: false, startLevel: -1 });
       hlsInstance.loadSource(s.url);
       hlsInstance.attachMedia(audioEl);
       hlsInstance.on(Hls.Events.MANIFEST_PARSED, function() {
+        // Start muted â browsers always allow muted autoplay.
+        // Unmute immediately after so the user hears audio.
+        audioEl.muted = true;
         audioEl.play().then(function() {
+          audioEl.muted = false;
           document.getElementById('npBars').className = 'np-bars';
         }).catch(function(e) {
-          showError('Playback blocked. Tap to try again.');
+          audioEl.muted = false;
+          showError('Playback blocked. Tap station again.');
           document.getElementById('npBars').className = 'np-bars idle';
         });
       });
@@ -311,10 +317,13 @@
     } else if (audioEl.canPlayType('application/vnd.apple.mpegurl')) {
       // Native HLS (Safari / iOS)
       audioEl.src = s.url;
+      audioEl.muted = true;
       audioEl.play().then(function() {
+        audioEl.muted = false;
         document.getElementById('npBars').className = 'np-bars';
       }).catch(function(e) {
-        showError('Playback error. Tap to try again.');
+        audioEl.muted = false;
+        showError('Playback error. Tap station again.');
         document.getElementById('npBars').className = 'np-bars idle';
       });
     } else {
